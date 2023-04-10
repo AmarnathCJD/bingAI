@@ -1,4 +1,4 @@
-#TODO: close TCP conn after reading response to prevent RCT Signal
+#TODO (critical): close TCP conn after reading response to prevent RCT Signal
 
 # BingAI
 
