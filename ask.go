@@ -29,7 +29,7 @@ func (b *bingConv) MakePayload(prompt string) []byte {
 					"disable_emoji_spoken_text",
 					"responsible_ai_policy_235",
 					"enablemm",
-					"h3precise",
+					"h3relaxedimg",
 					"dtappid",
 					"cricinfo",
 					"cricinfov2",
