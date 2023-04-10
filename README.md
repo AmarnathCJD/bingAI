@@ -1,3 +1,5 @@
+#TODO: close TCP conn after reading response to prevent RCT Signal
+
 # BingAI
 
 BingAI is a Telegram bot that utilizes Bing Sydney AI Lab's [Bing](https://www.bing.com/chat) chatbot to answer your questions and perform simple tasks.
