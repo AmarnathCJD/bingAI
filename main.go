@@ -112,7 +112,7 @@ func startHandler(m *telegram.NewMessage) error {
 	m.Reply(startMessage, telegram.SendOptions{
 		ReplyMarkup: b.Keyboard(
 			b.Row(
-				b.Mention("Contact Developer", 1833850637),
+				b.URL("Contact Developer", "https://t.me/roseloverx"),
 			),
 			b.Row(
 				b.URL("Bing Chatbot", "https://www.bing.com/chat"),
