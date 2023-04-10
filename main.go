@@ -66,6 +66,7 @@ func main() {
 	log.Println("BingAI is ready to answer your questions!")
 
 	tg.AddMessageHandler(telegram.OnNewMessage, bingAIHandler)
+	tg.AddMessageHandler("/start", startHandler)
 	tg.Idle()
 }
 
@@ -89,6 +90,7 @@ func triggerDetector(m *telegram.NewMessage) (string, bool) {
 
 func bingAIHandler(m *telegram.NewMessage) error {
 	if query, ok := triggerDetector(m); ok {
+		m.SendAction("typing")
 		if resp, err := cli.Ask(context.Background(), query); err == nil {
 			if _, err := m.Reply(resp.Message); err != nil {
 				log.Println(err)
@@ -97,5 +99,26 @@ func bingAIHandler(m *telegram.NewMessage) error {
 			log.Println(err)
 		}
 	}
+	return nil
+}
+
+var startMessage = `Hi, I'm BingAI, a bot that answers your questions using Bing Chatbot.`
+
+func startHandler(m *telegram.NewMessage) error {
+	if !m.IsPrivate() {
+		m.Reply(startMessage)
+	}
+	b := telegram.Button{}
+	m.Reply(startMessage, telegram.SendOptions{
+		ReplyMarkup: b.Keyboard(
+			b.Row(
+				b.Mention("Contact Developer", 1833850637),
+			),
+			b.Row(
+				b.URL("Bing Chatbot", "https://www.bing.com/chat"),
+				b.URL("Source Code", "https://github.com/amarnathcjd/bingai"),
+			),
+		),
+	})
 	return nil
 }
