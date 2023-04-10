@@ -107,6 +107,7 @@ var startMessage = `Hi, I'm BingAI, a bot that answers your questions using Bing
 func startHandler(m *telegram.NewMessage) error {
 	if !m.IsPrivate() {
 		m.Reply(startMessage)
+                return nil
 	}
 	b := telegram.Button{}
 	m.Reply(startMessage, telegram.SendOptions{
