@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"nhooyr.io/websocket"
 )
@@ -25,6 +26,7 @@ var SOC_HEADERS = map[string]string{
 
 // soc is a wrapper around websocket.Conn to make it easier to use
 type soc struct {
+	sync.Mutex
 	ctx        context.Context
 	url        string
 	connection *websocket.Conn

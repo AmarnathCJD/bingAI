@@ -2,19 +2,15 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	mrand "math/rand"
 	"net/http"
-	"strings"
 )
 
 type Client struct {
 	sessionName string
 	initFlag    bool
+	defaultConv *bingConv
 	convs       map[string]*bingConv
 	cookies     []*http.Cookie
 	wss         *soc
@@ -62,7 +58,7 @@ var AUTH_HEADERS = map[string]string{
 	"x-forwarded-for":           fakeIp,
 }
 
-func (c *Client) initAuth(ctx context.Context) error {
+func (c *Client) initConv(ctx context.Context) (*bingConv, error) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", "https://edgeservices.bing.com/edgesvc/turing/conversation/create", nil)
 	for k, v := range AUTH_HEADERS {
 		req.Header.Set(k, v)
@@ -72,32 +68,26 @@ func (c *Client) initAuth(ctx context.Context) error {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		req, _ := http.NewRequestWithContext(ctx, "GET", "https://edge.churchless.tech/edgesvc/turing/conversation/create", nil)
-		for k, v := range AUTH_HEADERS {
-			req.Header.Set(k, v)
-		}
-		for _, cookie := range c.cookies {
-			req.AddCookie(cookie)
-		}
+	RETRY_COUNT := 0
+	for resp.StatusCode != 200 && RETRY_COUNT < 3 {
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return fmt.Errorf("failed to create conversation: %s", resp.Status)
-		}
+		RETRY_COUNT++
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to init auth after %d retries, status code: %d", RETRY_COUNT, resp.StatusCode)
 	}
 	var bingResp bingConv
 	if err := json.NewDecoder(resp.Body).Decode(&bingResp); err != nil {
-		return err
+		return nil, err
 	}
-	c.convs["default"] = &bingResp
-	return nil
+	return &bingResp, nil
 }
 
 func (c *Client) Start(ctx context.Context) error {
@@ -107,8 +97,11 @@ func (c *Client) Start(ctx context.Context) error {
 	if err := c.wss.initialHandshake(); err != nil {
 		return err
 	}
-	if err := c.initAuth(ctx); err != nil {
+	if conv, err := c.initConv(ctx); err != nil {
 		return err
+	} else {
+		c.convs[conv.ConversationID] = conv
+		c.defaultConv = conv
 	}
 	c.initFlag = true
 	return nil
@@ -118,56 +111,14 @@ func (c *Client) ExportAuthToken() string {
 	return cookieToAccessToken(c.cookies[0])
 }
 
-// ------------- Helper functions -------------
-
-func genRandomIP() string {
-	return fmt.Sprintf("%d.%d.%d.%d", mrand.Intn(255), mrand.Intn(255), mrand.Intn(255), mrand.Intn(255))
-}
-
-func resolveCookies(c string) []*http.Cookie {
-	cookies := []*http.Cookie{}
-	for _, cookie := range strings.Split(c, ";") {
-		cookie = strings.TrimSpace(cookie)
-		split := strings.Split(cookie, "=")
-		cookies = append(cookies, &http.Cookie{
-			Name:  split[0],
-			Value: split[1],
-		})
+func (c *Client) NewConversation(ctx context.Context) (*bingConv, error) {
+	if !c.initFlag {
+		return nil, fmt.Errorf("client not initialized")
 	}
-	return cookies
-}
-
-func genRandHex(n int) string {
-	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		panic(err)
+	conv, err := c.initConv(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return hex.EncodeToString(bytes)
-}
-
-func genUUID4() string {
-	return fmt.Sprintf("%s-%s-4%s-%s-%s", genRandHex(8), genRandHex(4), genRandHex(3), genRandHex(4), genRandHex(12))
-}
-
-func cookieToAccessToken(cookie *http.Cookie) string {
-	cookieValue := cookie.Value
-	urlsafe_b64encode := func(s string) string {
-		return strings.TrimRight(base64.URLEncoding.EncodeToString([]byte(s)), "=")
-	}
-	return urlsafe_b64encode(cookieValue)
-}
-
-func accessTokenToCookie(token string) *http.Cookie {
-	urlsafe_b64decode := func(s string) string {
-		missing_padding := len(s) % 4
-		if missing_padding != 0 {
-			s += strings.Repeat("=", 4-missing_padding)
-		}
-		b, _ := base64.URLEncoding.DecodeString(s)
-		return string(b)
-	}
-	return &http.Cookie{
-		Name:  "_U",
-		Value: urlsafe_b64decode(token),
-	}
+	c.convs[conv.ConversationID] = conv
+	return conv, nil
 }

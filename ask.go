@@ -69,8 +69,17 @@ type bingResp struct {
 	InvocationID string `json:"invocationId"`
 	Item         struct {
 		Messages []struct {
-			Text   string `json:"text"`
-			Author string `json:"author"`
+			Text          string `json:"text"`
+			Author        string `json:"author"`
+			AdaptiveCards []struct {
+				Type    string `json:"type"`
+				Version string `json:"version"`
+				Body    []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+					Wrap bool   `json:"wrap"`
+				} `json:"body"`
+			} `json:"adaptiveCards,omitempty"`
 		} `json:"messages"`
 	} `json:"item"`
 }
@@ -95,9 +104,19 @@ func (c *Client) Ask(ctx context.Context, prompt string, conversationId ...strin
 	var conv *bingConv
 	var convoId string
 	if len(conversationId) == 0 {
-		conv = c.convs["default"]
-		convoId = "default"
+		if c.defaultConv.invocationID+1 > 19 {
+			c.defaultConv, _ = c.initConv(ctx)
+		}
+		conv = c.defaultConv
+		convoId = c.defaultConv.ConversationID
 	} else {
+		if c.convs[conversationId[0]].invocationID+1 > 19 {
+			newConv, err := c.initConv(ctx)
+			if err != nil {
+				return nil, err
+			}
+			c.convs[conversationId[0]] = newConv
+		}
 		conv = c.convs[conversationId[0]]
 		convoId = conversationId[0]
 	}
@@ -109,6 +128,8 @@ func (c *Client) Ask(ctx context.Context, prompt string, conversationId ...strin
 	if err := c.wss.Send(payload); err != nil {
 		return nil, err
 	}
+	c.wss.Lock()
+	defer c.wss.Unlock()
 	for {
 		select {
 		case <-ctx.Done():
