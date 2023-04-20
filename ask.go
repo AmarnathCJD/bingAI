@@ -98,8 +98,13 @@ func (c *Client) Ask(ctx context.Context, prompt string, conversationId ...strin
 	if !c.initFlag {
 		return nil, fmt.Errorf("client not initialized, call Start() first")
 	}
-	if !c.wss.IsActive() {
-		return nil, fmt.Errorf("websocket not active, call Start() again")
+	wss := NewSoc("wss://sydney.bing.com/sydney/ChatHub")
+	if err := wss.Connect(ctx); err != nil {
+		return nil, err
+	}
+	defer wss.Close()
+	if err := wss.Send([]byte(`{"protocol":"json","version":1}`)); err != nil {
+		return nil, err
 	}
 	var conv *bingConv
 	var convoId string
@@ -125,17 +130,15 @@ func (c *Client) Ask(ctx context.Context, prompt string, conversationId ...strin
 	}
 	payload := conv.MakePayload(prompt)
 	c.convs[convoId].invocationID++ // increment invocation id
-	if err := c.wss.Send(payload); err != nil {
+	if err := wss.Send(payload); err != nil {
 		return nil, err
 	}
-	c.wss.Lock()
-	defer c.wss.Unlock()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			resp, err := c.wss.Receive()
+			resp, err := wss.Receive()
 			if err != nil {
 				return nil, err
 			}

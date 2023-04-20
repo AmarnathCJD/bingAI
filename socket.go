@@ -32,6 +32,12 @@ type soc struct {
 	connection *websocket.Conn
 }
 
+func NewSoc(url string) *soc {
+	return &soc{
+		url: url,
+	}
+}
+
 func (w *soc) IsActive() bool {
 	return w.connection != nil
 }
@@ -84,16 +90,4 @@ func (w *soc) Receive() ([]byte, error) {
 		final_data = []byte(strings.Split(string(final_data), "\x1e")[0])
 	}
 	return []byte(final_data), nil
-}
-
-func (w *soc) initialHandshake() error {
-	if w.connection == nil {
-		return fmt.Errorf("connection is not active")
-	}
-	err := w.Send([]byte(`{"protocol":"json","version":1}`))
-	if err != nil {
-		return err
-	}
-	_, err = w.Receive()
-	return err
 }

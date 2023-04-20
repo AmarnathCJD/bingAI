@@ -13,7 +13,7 @@ type Client struct {
 	defaultConv *bingConv
 	convs       map[string]*bingConv
 	cookies     []*http.Cookie
-	wss         *soc
+	senders     []*soc
 }
 
 type Config struct {
@@ -34,9 +34,6 @@ func NewClient(config *Config) *Client {
 	client := &Client{
 		sessionName: config.SessionName,
 		convs:       map[string]*bingConv{},
-		wss: &soc{
-			url: config.BaseURL,
-		},
 	}
 
 	if config.AccessToken != "" {
@@ -91,12 +88,6 @@ func (c *Client) initConv(ctx context.Context) (*bingConv, error) {
 }
 
 func (c *Client) Start(ctx context.Context) error {
-	if err := c.wss.Connect(ctx); err != nil {
-		return err
-	}
-	if err := c.wss.initialHandshake(); err != nil {
-		return err
-	}
 	if conv, err := c.initConv(ctx); err != nil {
 		return err
 	} else {
